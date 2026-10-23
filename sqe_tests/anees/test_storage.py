@@ -108,3 +108,62 @@ class TestJSONStorageReadWrite:
         storage.write({"t": {}})
         assert storage.read() == {"t": {}}
         assert json.loads((tmp_path / "db.json").read_text()) == {"t": {}}
+
+# ============================== PART 3 =====================================
+class TestCachingMiddleware:
+    """CachingMiddleware: write cache, flush and close"""
+
+    @pytest.fixture
+    def cache(self):
+        c = CachingMiddleware(MemoryStorage)()
+        c.storage.write({"start": {}})       # data already saved in real storage
+        return c
+
+    @pytest.mark.parametrize("writes, saved", [
+        (2, False),   # BVA: one below the limit
+        (3, True),    # BVA: on the limit
+    ])
+    def test_cache_size_boundary_small(self, cache, writes, saved):
+        cache.WRITE_CACHE_SIZE = 3
+        for i in range(writes):
+            cache.write({"last": {"i": i}})
+        assert (cache.storage.read() == {"last": {"i": writes - 1}}) is saved
+
+    def test_default_limit_999_not_saved(self, cache):              # BVA 999
+        for i in range(999):
+            cache.write({"last": {"i": i}})
+        assert cache.storage.read() == {"start": {}}
+
+    def test_default_limit_1000_saved(self, cache):                 # BVA 1000
+        for i in range(1000):
+            cache.write({"last": {"i": i}})
+        assert cache.storage.read() == {"last": {"i": 999}}
+
+    def test_write_after_flush_is_cached_again(self, cache):        # BVA 1001
+        for i in range(1001):
+            cache.write({"last": {"i": i}})
+        assert cache.storage.read() == {"last": {"i": 999}}
+
+    def test_read_returns_cached_data(self, cache):
+        cache.write({"new": {}})
+        assert cache.read() == {"new": {}}
+
+    def test_flush_saves_pending_writes(self, cache):               # EC1
+        cache.write({"new": {}})
+        cache.flush()
+        assert cache.storage.read() == {"new": {}}
+
+    def test_flush_without_pending_writes(self, cache):             # EC2
+        cache.flush()
+        assert cache.storage.read() == {"start": {}}
+
+    def test_close_saves_pending_writes(self, cache):               # EC3
+        cache.write({"new": {}})
+        cache.close()
+        assert cache.storage.read() == {"new": {}}
+
+    @pytest.mark.parametrize("action", ["read", "write"])
+    def test_use_after_close_raises(self, cache, action):           # EC4
+        cache.close()
+        with pytest.raises(ValueError):
+            cache.read() if action == "read" else cache.write({})
