@@ -11,6 +11,9 @@ from tinydb import Query
 
 CSV_FILE = Path(__file__).parent.parent / "data" / "query_age_data.csv"
 
+# Task 4: groups + execution order (runs 5th)
+pytestmark = [pytest.mark.queries, pytest.mark.data_driven, pytest.mark.order(5)]
+
 
 def load_rows():
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
