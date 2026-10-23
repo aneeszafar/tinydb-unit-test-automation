@@ -14,6 +14,10 @@ from tinydb.storages import MemoryStorage
 CSV_FILE = Path(__file__).parent.parent / "data" / "table_insert_data.csv"
 
 
+# Task 4: groups + execution order (runs 4th)
+pytestmark = [pytest.mark.table, pytest.mark.data_driven, pytest.mark.order(4)]
+
+
 def load_rows():
     with open(CSV_FILE, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
