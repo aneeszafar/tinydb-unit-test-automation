@@ -1,0 +1,9 @@
+tc_id,description,operator,limit,age,expected
+TC-Q-01,Below boundary for >=,>=,18,17,False
+TC-Q-02,On boundary for >=,>=,18,18,True
+TC-Q-03,Above boundary for >=,>=,18,19,True
+TC-Q-04,On boundary for >,>,18,18,False
+TC-Q-05,Above boundary for >,>,18,19,True
+TC-Q-06,On boundary for <,<,18,18,False
+TC-Q-07,Below boundary for <,<,18,17,True
+TC-Q-08,Equal value for ==,==,18,18,True
