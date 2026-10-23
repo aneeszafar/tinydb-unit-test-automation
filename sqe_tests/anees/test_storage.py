@@ -15,6 +15,9 @@ from tinydb.storages import JSONStorage, MemoryStorage
 
 SAMPLE = {"users": {"1": {"name": "Ali"}}}
 
+# Task 4: group marker + group execution order (storage group runs 1st)
+pytestmark = [pytest.mark.storage, pytest.mark.order(1)]
+
 
 # ============================== PART 1 =====================================
 class TestMemoryStorage:
@@ -23,6 +26,7 @@ class TestMemoryStorage:
     def test_new_storage_reads_none(self):                          # EC1
         assert MemoryStorage().read() is None
 
+    @pytest.mark.smoke
     def test_write_then_read(self):                                 # EC2
         storage = MemoryStorage()
         storage.write(SAMPLE)
@@ -53,6 +57,7 @@ class TestJSONStorageCreate:
         JSONStorage(str(path)).close()
         assert path.exists()
 
+    @pytest.mark.negative
     def test_missing_folder_without_create_dirs_raises(self, tmp_path):  # EC2
         with pytest.raises(FileNotFoundError):
             JSONStorage(str(tmp_path / "x" / "y" / "db.json"))
@@ -69,6 +74,7 @@ class TestJSONStorageCreate:
     def test_safe_access_mode_no_warning(self, tmp_path, recwarn):
         JSONStorage(str(tmp_path / "db.json"), access_mode="r+").close()
         assert len(recwarn) == 0
+
 
 # ============================== PART 2 =====================================
 class TestJSONStorageReadWrite:
@@ -87,6 +93,7 @@ class TestJSONStorageReadWrite:
         storage.write(SAMPLE)
         assert storage.read() == SAMPLE
 
+    @pytest.mark.negative
     def test_read_only_mode_write_raises(self, tmp_path):           # EC3
         path = tmp_path / "db.json"
         path.write_text("{}")
@@ -95,6 +102,7 @@ class TestJSONStorageReadWrite:
             storage.write(SAMPLE)
         storage.close()
 
+    @pytest.mark.negative
     def test_corrupted_json_raises(self, tmp_path):                 # EC4
         path = tmp_path / "db.json"
         path.write_text("{bad")
@@ -108,6 +116,7 @@ class TestJSONStorageReadWrite:
         storage.write({"t": {}})
         assert storage.read() == {"t": {}}
         assert json.loads((tmp_path / "db.json").read_text()) == {"t": {}}
+
 
 # ============================== PART 3 =====================================
 class TestCachingMiddleware:
@@ -148,6 +157,7 @@ class TestCachingMiddleware:
         cache.write({"new": {}})
         assert cache.read() == {"new": {}}
 
+    @pytest.mark.smoke
     def test_flush_saves_pending_writes(self, cache):               # EC1
         cache.write({"new": {}})
         cache.flush()
@@ -157,11 +167,13 @@ class TestCachingMiddleware:
         cache.flush()
         assert cache.storage.read() == {"start": {}}
 
+    @pytest.mark.order("last")   # Task 4: this test always runs last in its group
     def test_close_saves_pending_writes(self, cache):               # EC3
         cache.write({"new": {}})
         cache.close()
         assert cache.storage.read() == {"new": {}}
 
+    @pytest.mark.negative
     @pytest.mark.parametrize("action", ["read", "write"])
     def test_use_after_close_raises(self, cache, action):           # EC4
         cache.close()
