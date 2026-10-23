@@ -89,3 +89,56 @@ class TestInsertMultiple:
 
     def test_insert_multiple_continues_ids(self, filled_table):
         assert filled_table.insert_multiple([{"x": 1}, {"x": 2}]) == [4, 5]
+
+# ============================== PART 2 =====================================
+class TestGet:
+    """Table.get(cond / doc_id / doc_ids)"""
+
+    def test_get_existing_doc_id(self, filled_table):              # EC1
+        assert filled_table.get(doc_id=2)["name"] == "Sara"
+
+    @pytest.mark.parametrize("missing_id", [99, 0, -1])            # EC2, EC3 (boundaries)
+    def test_get_missing_doc_id_returns_none(self, filled_table, missing_id):
+        assert filled_table.get(doc_id=missing_id) is None
+
+    def test_get_doc_ids_ignores_missing(self, filled_table):      # EC4
+        docs = filled_table.get(doc_ids=[1, 99])
+        assert [d.doc_id for d in docs] == [1]
+
+    def test_get_by_condition_returns_first_match(self, filled_table):  # EC5
+        assert filled_table.get(q.age > 15).doc_id == 2
+
+    def test_get_by_condition_no_match(self, filled_table):
+        assert filled_table.get(q.age > 100) is None
+
+    def test_get_without_arguments_raises(self, filled_table):     # ERR1
+        with pytest.raises(RuntimeError):
+            filled_table.get()
+
+
+class TestUpdate:
+    """Table.update(fields, cond / doc_ids)"""
+
+    def test_update_without_condition_updates_all(self, filled_table):  # EC1
+        assert filled_table.update({"active": True}) == [1, 2, 3]
+        assert all(d["active"] for d in filled_table.all())
+
+    def test_update_with_condition_updates_matching(self, filled_table):  # EC2
+        assert filled_table.update({"adult": True}, q.age > 15) == [2, 3]
+        assert "adult" not in filled_table.get(doc_id=1)
+
+    def test_update_condition_matches_none(self, filled_table):    # EC3
+        assert filled_table.update({"x": 1}, q.age > 100) == []
+
+    def test_update_missing_doc_ids(self, filled_table):           # EC4
+        assert filled_table.update({"x": 1}, doc_ids=[99]) == []
+
+    def test_update_with_function(self, filled_table):             # EC5
+        def birthday(doc):
+            doc["age"] += 1
+        filled_table.update(birthday, doc_ids=[1])
+        assert filled_table.get(doc_id=1)["age"] == 11
+
+    def test_update_overwrites_existing_field(self, filled_table):
+        filled_table.update({"name": "Ahmed"}, doc_ids=[1])
+        assert filled_table.get(doc_id=1)["name"] == "Ahmed"
