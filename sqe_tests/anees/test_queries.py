@@ -13,10 +13,15 @@ from tinydb.queries import QueryInstance
 q = Query()
 
 
+# Task 4: group marker + group execution order (queries group runs 3rd)
+pytestmark = [pytest.mark.queries, pytest.mark.order(3)]
+
+
 # ============================== PART 1 =====================================
 class TestComparisonOperators:
     """==, !=, <, <=, >, >= on a field"""
 
+    @pytest.mark.smoke
     def test_condition_true(self):                                  # EC1
         assert (q.age >= 18)({"age": 25}) is True
 
@@ -26,6 +31,7 @@ class TestComparisonOperators:
     def test_missing_field_returns_false(self):                     # EC3
         assert (q.age >= 18)({"name": "Ali"}) is False
 
+    @pytest.mark.negative
     def test_wrong_type_raises_type_error(self):                    # EC4
         with pytest.raises(TypeError):
             (q.age >= 18)({"age": "abc"})
@@ -67,6 +73,7 @@ class TestExists:
 
     def test_exists_with_where_helper(self):
         assert where("email").exists()({"email": ""}) is True
+
 
 # ============================== PART 2 =====================================
 class TestRegex:
@@ -112,6 +119,7 @@ class TestOneOf:
     def test_missing_field(self):
         assert q.role.one_of(["admin"])({}) is False
 
+
 # ============================== PART 3 =====================================
 class TestAnyAll:
     """Query.any() and Query.all() on list fields"""
@@ -139,6 +147,7 @@ class TestAnyAll:
 class TestLogicalOperators:
     """&, |, ~ and error cases on QueryInstance"""
 
+    @pytest.mark.smoke
     def test_and_both_true(self):                                   # EC1
         cond = (q.age > 18) & (q.city == "Lahore")
         assert cond({"age": 25, "city": "Lahore"}) is True
@@ -157,6 +166,8 @@ class TestLogicalOperators:
     def test_result_is_query_instance(self):
         assert isinstance((q.age > 1) & (q.age < 5), QueryInstance)
 
+    @pytest.mark.negative
+    @pytest.mark.order("last")   # Task 4: this test always runs last in its group
     def test_empty_query_raises_runtime_error(self):                # ERR1
         with pytest.raises(RuntimeError):
             Query()({"age": 1})
