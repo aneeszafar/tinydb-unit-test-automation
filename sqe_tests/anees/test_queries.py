@@ -111,3 +111,57 @@ class TestOneOf:
 
     def test_missing_field(self):
         assert q.role.one_of(["admin"])({}) is False
+
+# ============================== PART 3 =====================================
+class TestAnyAll:
+    """Query.any() and Query.all() on list fields"""
+
+    def test_any_some_match(self):                                  # EC1
+        assert q.tags.any(["b", "z"])({"tags": ["a", "b"]}) is True
+
+    def test_any_no_match(self):                                    # EC2
+        assert q.tags.any(["x", "z"])({"tags": ["a", "b"]}) is False
+
+    def test_all_every_item_present(self):                          # EC3
+        assert q.tags.all(["a", "b"])({"tags": ["a", "b"]}) is True
+
+    def test_all_one_item_missing(self):                            # EC4
+        assert q.tags.all(["a", "b"])({"tags": ["a"]}) is False
+
+    def test_any_on_empty_list_field(self):                         # BVA
+        assert q.tags.any(["a"])({"tags": []}) is False
+
+    def test_any_with_sub_query(self):
+        doc = {"items": [{"price": 50}, {"price": 150}]}
+        assert q.items.any(Query().price > 100)(doc) is True
+
+
+class TestLogicalOperators:
+    """&, |, ~ and error cases on QueryInstance"""
+
+    def test_and_both_true(self):                                   # EC1
+        cond = (q.age > 18) & (q.city == "Lahore")
+        assert cond({"age": 25, "city": "Lahore"}) is True
+
+    def test_and_one_false(self):                                   # EC2
+        cond = (q.age > 18) & (q.city == "Lahore")
+        assert cond({"age": 25, "city": "Karachi"}) is False
+
+    def test_or_one_true(self):                                     # EC3
+        cond = (q.age > 18) | (q.city == "Lahore")
+        assert cond({"age": 10, "city": "Lahore"}) is True
+
+    def test_not(self):                                             # EC4
+        assert (~(q.age > 18))({"age": 25}) is False
+
+    def test_result_is_query_instance(self):
+        assert isinstance((q.age > 1) & (q.age < 5), QueryInstance)
+
+    def test_empty_query_raises_runtime_error(self):                # ERR1
+        with pytest.raises(RuntimeError):
+            Query()({"age": 1})
+
+    def test_custom_test_function(self):
+        is_even = lambda value: value % 2 == 0
+        assert q.num.test(is_even)({"num": 4}) is True
+        assert q.num.test(is_even)({"num": 3}) is False
