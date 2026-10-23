@@ -69,3 +69,42 @@ class TestJSONStorageCreate:
     def test_safe_access_mode_no_warning(self, tmp_path, recwarn):
         JSONStorage(str(tmp_path / "db.json"), access_mode="r+").close()
         assert len(recwarn) == 0
+
+# ============================== PART 2 =====================================
+class TestJSONStorageReadWrite:
+    """JSONStorage.read() / write()"""
+
+    @pytest.fixture
+    def storage(self, tmp_path):
+        s = JSONStorage(str(tmp_path / "db.json"))
+        yield s
+        s.close()
+
+    def test_empty_file_reads_none(self, storage):                  # EC1 (size 0)
+        assert storage.read() is None
+
+    def test_write_then_read(self, storage):                        # EC2
+        storage.write(SAMPLE)
+        assert storage.read() == SAMPLE
+
+    def test_read_only_mode_write_raises(self, tmp_path):           # EC3
+        path = tmp_path / "db.json"
+        path.write_text("{}")
+        storage = JSONStorage(str(path), access_mode="r")
+        with pytest.raises(IOError):
+            storage.write(SAMPLE)
+        storage.close()
+
+    def test_corrupted_json_raises(self, tmp_path):                 # EC4
+        path = tmp_path / "db.json"
+        path.write_text("{bad")
+        storage = JSONStorage(str(path))
+        with pytest.raises(json.JSONDecodeError):
+            storage.read()
+        storage.close()
+
+    def test_smaller_second_write_leaves_no_leftover(self, storage, tmp_path):  # EC5
+        storage.write({"t": {str(i): {"v": "x" * 50} for i in range(20)}})
+        storage.write({"t": {}})
+        assert storage.read() == {"t": {}}
+        assert json.loads((tmp_path / "db.json").read_text()) == {"t": {}}
