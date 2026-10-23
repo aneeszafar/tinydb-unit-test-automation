@@ -67,3 +67,47 @@ class TestExists:
 
     def test_exists_with_where_helper(self):
         assert where("email").exists()({"email": ""}) is True
+
+# ============================== PART 2 =====================================
+class TestRegex:
+    """Query.matches() (from start) vs Query.search() (anywhere)"""
+
+    @pytest.mark.parametrize("pattern, value, expected_match, expected_search", [
+        ("Jo", "John", True, True),       # EC1
+        ("oh", "John", False, True),      # EC2
+        ("xyz", "John", False, False),    # EC3
+        ("^$", "", True, True),           # BVA: empty string
+    ])
+    def test_matches_vs_search(self, pattern, value, expected_match, expected_search):
+        doc = {"name": value}
+        assert q.name.matches(pattern)(doc) is expected_match
+        assert q.name.search(pattern)(doc) is expected_search
+
+    def test_matches_case_sensitive_by_default(self):
+        assert q.name.matches("john")({"name": "John"}) is False
+
+    def test_matches_with_ignorecase_flag(self):
+        import re
+        assert q.name.matches("john", flags=re.IGNORECASE)({"name": "John"}) is True
+
+    def test_regex_on_missing_field(self):
+        assert q.name.search("a")({}) is False
+
+
+class TestOneOf:
+    """Query.one_of(items)"""
+
+    def test_value_in_list(self):                                   # EC1
+        assert q.role.one_of(["admin", "user"])({"role": "admin"}) is True
+
+    def test_value_not_in_list(self):                               # EC2
+        assert q.role.one_of(["admin", "user"])({"role": "guest"}) is False
+
+    def test_empty_list(self):                                      # BVA: 0 items
+        assert q.role.one_of([])({"role": "admin"}) is False
+
+    def test_single_item_list(self):                                # BVA: 1 item
+        assert q.role.one_of(["admin"])({"role": "admin"}) is True
+
+    def test_missing_field(self):
+        assert q.role.one_of(["admin"])({}) is False
