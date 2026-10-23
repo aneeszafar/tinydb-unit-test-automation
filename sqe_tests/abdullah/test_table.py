@@ -3,7 +3,7 @@
 
 # Unit tests for the Table and Document classes, designed with
 # Equivalence Class Partitioning (ECP) and Boundary Value Analysis (BVA).
-# Test IDs (EC1, BVA, ERR1 ...) match docs/notes/module3_table_ecp_bva.md 
+# Test IDs (EC1, BVA, ERR1 ...) match docs/notes/module3_table_ecp_bva.md
 
 import pytest
 
@@ -37,10 +37,15 @@ def filled_table(table):
 q = Query()
 
 
+# Task 4: group marker + group execution order (table group runs 2nd)
+pytestmark = [pytest.mark.table, pytest.mark.order(2)]
+
+
 # ============================== PART 1 =====================================
 class TestInsert:
     """Table.insert(document)"""
 
+    @pytest.mark.smoke
     def test_insert_valid_dict_returns_id(self, table):            # EC1
         doc_id = table.insert({"name": "Ali"})
         assert doc_id == 1
@@ -50,12 +55,14 @@ class TestInsert:
         assert table.insert({}) == 1
         assert len(table) == 1
 
+    @pytest.mark.negative
     @pytest.mark.parametrize("bad_doc", [[1, 2], "abc", 5, None])  # EC3, EC4
     def test_insert_non_mapping_raises_value_error(self, table, bad_doc):
         with pytest.raises(ValueError):
             table.insert(bad_doc)
         assert len(table) == 0
 
+    @pytest.mark.negative
     def test_insert_document_with_existing_id_raises(self, table): # EC5
         table.insert({"a": 1})
         with pytest.raises(ValueError):
@@ -82,6 +89,7 @@ class TestInsertMultiple:
     def test_insert_multiple_single_item(self, table):             # EC3 (boundary: 1 item)
         assert table.insert_multiple([{"a": 1}]) == [1]
 
+    @pytest.mark.negative
     def test_insert_multiple_with_one_invalid_inserts_nothing(self, table):  # EC4
         with pytest.raises(ValueError):
             table.insert_multiple([{"a": 1}, 5])
@@ -90,10 +98,12 @@ class TestInsertMultiple:
     def test_insert_multiple_continues_ids(self, filled_table):
         assert filled_table.insert_multiple([{"x": 1}, {"x": 2}]) == [4, 5]
 
+
 # ============================== PART 2 =====================================
 class TestGet:
     """Table.get(cond / doc_id / doc_ids)"""
 
+    @pytest.mark.smoke
     def test_get_existing_doc_id(self, filled_table):              # EC1
         assert filled_table.get(doc_id=2)["name"] == "Sara"
 
@@ -111,6 +121,7 @@ class TestGet:
     def test_get_by_condition_no_match(self, filled_table):
         assert filled_table.get(q.age > 100) is None
 
+    @pytest.mark.negative
     def test_get_without_arguments_raises(self, filled_table):     # ERR1
         with pytest.raises(RuntimeError):
             filled_table.get()
@@ -143,6 +154,7 @@ class TestUpdate:
         filled_table.update({"name": "Ahmed"}, doc_ids=[1])
         assert filled_table.get(doc_id=1)["name"] == "Ahmed"
 
+
 # ============================== PART 3 =====================================
 class TestRemoveAndTruncate:
     """Table.remove(cond / doc_ids) and Table.truncate()"""
@@ -159,10 +171,12 @@ class TestRemoveAndTruncate:
         assert filled_table.remove(doc_ids=[99]) == []
         assert len(filled_table) == 3
 
+    @pytest.mark.negative
     def test_remove_without_arguments_raises(self, filled_table):  # ERR1
         with pytest.raises(RuntimeError):
             filled_table.remove()
 
+    @pytest.mark.order("last")   # Task 4: this test always runs last in its group
     def test_truncate_empties_table(self, filled_table):           # EC3
         filled_table.truncate()
         assert len(filled_table) == 0
@@ -192,6 +206,7 @@ class TestCountContainsUpsert:
         assert filled_table.contains(q.name == "Sara") is True
         assert filled_table.contains(q.name == "Nobody") is False
 
+    @pytest.mark.negative
     def test_contains_without_arguments_raises(self, filled_table):  # ERR1
         with pytest.raises(RuntimeError):
             filled_table.contains()
@@ -205,6 +220,7 @@ class TestCountContainsUpsert:
         assert filled_table.upsert({"name": "Zara"}, q.name == "Zara") == [4]
         assert len(filled_table) == 4
 
+    @pytest.mark.negative
     def test_upsert_without_condition_raises(self, filled_table):  # ERR2
         with pytest.raises(ValueError):
             filled_table.upsert({"name": "X"})
