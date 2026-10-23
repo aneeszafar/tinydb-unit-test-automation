@@ -1,0 +1,8 @@
+tc_id,description,document,expected
+TC-T-01,Valid dict with one field,"{""name"": ""Ali""}",ok
+TC-T-02,Empty dict (boundary),{},ok
+TC-T-03,Dict with nested field,"{""address"": {""city"": ""Lahore""}}",ok
+TC-T-04,List instead of dict,"[1, 2]",ValueError
+TC-T-05,String instead of dict,"""abc""",ValueError
+TC-T-06,Integer instead of dict,5,ValueError
+TC-T-07,None instead of dict,null,ValueError
