@@ -142,3 +142,83 @@ class TestUpdate:
     def test_update_overwrites_existing_field(self, filled_table):
         filled_table.update({"name": "Ahmed"}, doc_ids=[1])
         assert filled_table.get(doc_id=1)["name"] == "Ahmed"
+
+# ============================== PART 3 =====================================
+class TestRemoveAndTruncate:
+    """Table.remove(cond / doc_ids) and Table.truncate()"""
+
+    def test_remove_by_condition(self, filled_table):              # EC1
+        assert filled_table.remove(q.age < 15) == [1]
+        assert len(filled_table) == 2
+
+    def test_remove_by_doc_ids(self, filled_table):
+        assert filled_table.remove(doc_ids=[2, 3]) == [2, 3]
+        assert len(filled_table) == 1
+
+    def test_remove_missing_doc_ids(self, filled_table):           # EC2
+        assert filled_table.remove(doc_ids=[99]) == []
+        assert len(filled_table) == 3
+
+    def test_remove_without_arguments_raises(self, filled_table):  # ERR1
+        with pytest.raises(RuntimeError):
+            filled_table.remove()
+
+    def test_truncate_empties_table(self, filled_table):           # EC3
+        filled_table.truncate()
+        assert len(filled_table) == 0
+
+    def test_truncate_on_empty_table(self, table):                 # boundary
+        table.truncate()
+        assert len(table) == 0
+
+
+class TestCountContainsUpsert:
+    """Table.count(), Table.contains(), Table.upsert()"""
+
+    @pytest.mark.parametrize("min_age, expected", [
+        (20, 2),     # EC1
+        (30, 1),     # BVA: on the highest value
+        (31, 0),     # BVA: just above the highest value
+        (10, 3),     # BVA: on the lowest value
+    ])
+    def test_count_with_boundaries(self, filled_table, min_age, expected):
+        assert filled_table.count(q.age >= min_age) == expected
+
+    def test_contains_doc_id(self, filled_table):                  # EC2
+        assert filled_table.contains(doc_id=1) is True
+        assert filled_table.contains(doc_id=99) is False
+
+    def test_contains_condition(self, filled_table):
+        assert filled_table.contains(q.name == "Sara") is True
+        assert filled_table.contains(q.name == "Nobody") is False
+
+    def test_contains_without_arguments_raises(self, filled_table):  # ERR1
+        with pytest.raises(RuntimeError):
+            filled_table.contains()
+
+    def test_upsert_updates_when_match_exists(self, filled_table):  # EC3
+        assert filled_table.upsert({"name": "Ali", "age": 11}, q.name == "Ali") == [1]
+        assert filled_table.get(doc_id=1)["age"] == 11
+        assert len(filled_table) == 3
+
+    def test_upsert_inserts_when_no_match(self, filled_table):     # EC4
+        assert filled_table.upsert({"name": "Zara"}, q.name == "Zara") == [4]
+        assert len(filled_table) == 4
+
+    def test_upsert_without_condition_raises(self, filled_table):  # ERR2
+        with pytest.raises(ValueError):
+            filled_table.upsert({"name": "X"})
+
+
+class TestDocument:
+    """Document class"""
+
+    def test_document_keeps_doc_id(self):
+        assert Document({"a": 1}, doc_id=7).doc_id == 7
+
+    def test_document_behaves_like_dict(self):
+        doc = Document({"a": 1}, doc_id=1)
+        assert doc["a"] == 1 and doc == {"a": 1}
+
+    def test_returned_documents_have_correct_ids(self, filled_table):
+        assert [d.doc_id for d in filled_table.all()] == [1, 2, 3]
